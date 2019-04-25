@@ -4,29 +4,43 @@
 <head>
     <title>Set Page Color Popup</title>
     <style>
-    body {
-      overflow: hidden;
-      margin: 0px;
-      padding: 0px;
-      background: white;
-    }
-    #button {
-        background-color: #4CAF50;
-        padding: 10px 24px;
-        font-size: 16px;
-        color: #fff;
-        border: 0;
-        font-family: Raleway;
-        border-radius: 4px;
-        font-weight: bold;
-        margin: 10px;
-    }
+        body {
+            overflow: hidden;
+            margin: 0px;
+            padding: 0px;
+            background: white;
+            width: 265px;
+            text-align: center;
+        }
+
+        #button {
+            background-color: #3ba4d0;
+            padding: 10px 40px;
+            font-size: 16px;
+            color: #fff;
+            border: 0;
+            font-family: Raleway;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px;
+            text-align: center;
+        }
+
+        #button img {
+            top: 4px;
+            right: 4px;
+            position: relative;
+        }
     </style>
     <script src="background.js"></script>
 </head>
 
 <body>
-    <button id="button" type="button">Capture</button>
+    <button id="button" type="button">
+        <div>
+            <img src="images/button-icons.png" /> Capture Document
+        </div>
+    </button>
 </body>
 
 </html>
