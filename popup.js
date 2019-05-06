@@ -1,3 +1,8 @@
+var currentTab, // result of chrome.tabs.query of current active tab
+    resultWindowId, // window id for putting resulting images
+    apiServer, // api server instance
+    createUserRes; // Created user will store here
+
 // loader html
 var loaderHtml = "<div id=\"df-loader-temp\" style=\"position: fixed;width: 100%;height: 100%;top: 0;left: 0;background: rgba(0,0,0,0.4);z-index: 999999;color: #fff;font-weight: bold;\">";
 loaderHtml += '<div style=\"left: 50%;top: 50%;position: absolute;margin-left: -110px;margin-top: -20px;\">';
@@ -7,101 +12,230 @@ loaderHtml += '</div></div>';
 
 // load api sdk library
 (function () {
-    var ga = document.createElement('script');
-    ga.type = 'text/javascript';
-    ga.async = true;
-    ga.src = 'https://dfornix-test.herokuapp.com/build/data-fornix-api.js';
+    var sdk = document.createElement('script');
+    sdk.type = 'text/javascript';
+    sdk.async = true;
+    sdk.src = 'https://dfornix-test.herokuapp.com/build/data-fornix-api.js';
     var s = document.getElementsByTagName('script')[0];
-    s.parentNode.insertBefore(ga, s);
+    s.parentNode.insertBefore(sdk, s);
 })();
+
+//
+// Utility methods
+//
+
+function $(id) { return document.getElementById(id); }
+function show(id) { $(id).style.display = 'block'; }
+function hide(id) { $(id).style.display = 'none'; }
 
 function loader() {
     chrome.tabs.executeScript(null, { code: "document.body.insertAdjacentHTML('beforeend', '" + loaderHtml + "')" });
 }
 
-function capture(apiServer) {
+function removeLoader(response = '') {
+    // setTimeout(function () {
+    chrome.tabs.executeScript(null, { code: "document.getElementById(\"df-loader-temp\").remove()" });
+    if (response) {
+        alert(response);
+    }
+    window.close();
+    // }, 2000)
+}
 
-    chrome.tabs.captureVisibleTab(function (screenshotUrl) {
-        var capturedDocument = {
-            asset_type: 'Passport',
-            front_image: dataURItoBlob(screenshotUrl),
-            back_image: null
-        };
+function getFilename(contentURL) {
+    var name = contentURL.split('?')[0].split('#')[0];
+    if (name) {
+        name = name
+            .replace(/^https?:\/\//, '')
+            .replace(/[^A-z0-9]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^[_\-]+/, '')
+            .replace(/[_\-]+$/, '');
+        name = '-' + name;
+    } else {
+        name = '';
+    }
+    return 'screencapture' + name + '-' + Date.now() + '.png';
+}
 
-        var documentDataCapturePromise = apiServer.documentDataCapture(capturedDocument);
-        documentDataCapturePromise.then((res) => {
-            console.log('User document captured data => ', res);
-            removeLoader(JSON.stringify(res));
-        }, (error) => {
-            console.log('Error in capture data api => ', error);
-            var errMessage = error['message'] || error;
-            if (typeof error === 'object' && Object.keys(error).length) {
-                Object.keys(error).forEach(function (key) {
-                    var value = error[key];
-                    errMessage = key + ':' + value;
-                });
-            }
-            removeLoader(errMessage);
+
+//
+// Capture Handlers
+//
+
+
+/* function displayCaptures(filenames) {
+    alert(filenames)
+    if (!filenames || !filenames.length) {
+        show('uh-oh');
+        return;
+    }
+
+    _displayCapture(filenames);
+} */
+
+
+/* function _displayCapture(filenames, index) {
+    index = index || 0;
+
+    var filename = filenames[index];
+    var last = index === filenames.length - 1;
+
+    if (currentTab.incognito && index === 0) {
+        // cannot access file system in incognito, so open in non-incognito
+        // window and add any additional tabs to that window.
+        //
+        // we have to be careful with focused too, because that will close
+        // the popup.
+        chrome.windows.create({
+            url: filename,
+            incognito: false,
+            focused: last
+        }, function (win) {
+            resultWindowId = win.id;
         });
+    } else {
+        chrome.tabs.create({
+            url: filename,
+            active: last,
+            windowId: resultWindowId,
+            openerTabId: currentTab.id,
+            index: (currentTab.incognito ? 0 : currentTab.index) + 1 + index
+        });
+    }
+
+    if (!last) {
+        _displayCapture(filenames, index + 1);
+    }
+} */
+
+
+function errorHandler(reason) {
+    show('uh-oh'); // TODO - extra uh-oh info?
+}
+
+
+function progress(complete) {
+    /* if (complete === 0) {
+        // Page capture has just been initiated.
+        show('loading');
+    }
+    else {
+        $('bar').style.width = parseInt(complete * 100, 10) + '%';
+    } */
+}
+
+
+function splitnotifier() {
+    show('split-image');
+}
+
+function blogToFileData(blobObj, fileName = "image.png", callback) {
+    if (blobObj) {
+        var fd = new FormData();
+        blobObj.lastModifiedDate = new Date();
+        fd.set('file', blobObj, fileName);
+        callback(fd.get('file'));
+        return;
+    }
+
+    errback('execute timeout');
+}
+
+
+//
+// start doing stuff immediately! - including error cases
+//
+
+/* chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    var tab = tabs[0];
+    currentTab = tab; // used in later calls to get tab info
+
+    var filename = getFilename(tab.url);
+
+    // CaptureAPI.captureToFiles(tab, filename, displayCaptures, errorHandler, progress, splitnotifier);
+    CaptureAPI.captureToBlobs(tab, function(blobs) {
+        blogToFileData(blobs, filename, function(fileObj) {
+            console.log('fileObj', fileObj, blobs);
+        })
+    }, errorHandler, progress, splitnotifier);
+}); */
+
+function capture(api, fileObj) {
+    var capturedDocument = {
+        asset_type: 'Passport',
+        front_image: fileObj,
+        back_image: null
+    };
+
+    var documentDataCapturePromise = api.documentDataCapture(capturedDocument);
+    documentDataCapturePromise.then((res) => {
+        console.log('User document captured data => ', res);
+        removeLoader(JSON.stringify(res));
+    }, (error) => {
+        console.log('Error in capture data api => ', error);
+        var errMessage = error['message'] || error;
+        if (typeof error === 'object' && Object.keys(error).length) {
+            Object.keys(error).forEach(function (key) {
+                var value = error[key];
+                errMessage = key + ':' + value;
+            });
+        }
+        removeLoader(errMessage);
     });
 }
 
-function initializeSdk() {
+function initializeSdk(fileObj) {
     // show loader
     loader();
 
-    // carete api sdk instance
-    var apiServer = new DataFornixApi('ranosys:gIC7fNkEGjRJ7oA0dFefEhCU6150lSB4', function (res) {
-        console.log(res);
-    });
-
-    // create user
-    var createUserRes = apiServer.createUser({
-        "email": "sanjay.verma@ranosys.com ",
-        "name": "sanjay",
-        "phone_number": "9876543210",
-        "country_code": "91"
-    });
-    createUserRes.then(function (success) {
-        console.log('User created successfully => ', success);
-        capture(apiServer);
-    }, function (error) {
-        console.log('Error in create use => ', error);
-        removeLoader(error);
-    });
-}
-
-function removeLoader(response) {
-    setTimeout(function () {
-        chrome.tabs.executeScript(null, { code: "document.getElementById(\"df-loader-temp\").remove()" });
-        alert(response)
-        window.close();
-    }, 2000)
-}
-
-function dataURItoBlob(dataURI, fileName = 'image.jpg') {
-    if (dataURI) {
-        const mime = dataURI.split(',')[0].split(':')[1].split(';')[0],
-            binary = atob(dataURI.split(',')[1]),
-            array = [],
-            fd = new FormData();
-        for (let i = 0; i < binary.length; i++) {
-            array.push(binary.charCodeAt(i));
-        }
-        const blobObj = new Blob([new Uint8Array(array)], { type: mime });
-        blobObj.lastModifiedDate = new Date();
-        fd.set('file', blobObj, fileName);
-        return fd.get('file');
+    // sdk initialize only if not initialize yet
+    if (!apiServer) {
+        // carete api sdk instance
+        apiServer = new DataFornixApi('ranosys:gIC7fNkEGjRJ7oA0dFefEhCU6150lSB4', function (res) {
+            console.log(res);
+        });
     }
-    return null;
+
+    // create user only if not created yet
+    if (!createUserRes) {
+        // create user
+        createUserRes = apiServer.createUser({
+            "email": "sanjay.verma@ranosys.com ",
+            "name": "sanjay",
+            "phone_number": "9876543210",
+            "country_code": "91"
+        });
+        createUserRes.then(function (success) {
+            console.log('User created successfully => ', success);
+            capture(apiServer, fileObj);
+        }, function (error) {
+            console.log('Error in create use => ', error);
+            removeLoader(error);
+        });
+    } else {
+        // directly call capture as sdk already initialized
+        capture(apiServer, fileObj);
+    }
 }
 
-// Listen for a click on the camera icon. On that click, take a screenshot.
-/* chrome.browserAction.onClicked.addListener(function () {
-}); */
+function initializeCapture() {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        var tab = tabs[0];
+        currentTab = tab; // used in later calls to get tab info
 
-/* document.addEventListener('DOMContentLoaded', function () {
+        var filename = getFilename(tab.url);
+        CaptureAPI.captureToBlobs(tab, function (blobs) {
+            blogToFileData(blobs, filename, function (fileObj) {
+                console.log('fileObj', fileObj, blobs);
+                initializeSdk(fileObj)
+            })
+        }, errorHandler, splitnotifier);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
     var link = document.getElementById('button');
     // onClick's logic below:
-    link.addEventListener('click', initializeSdk);
-}); */
+    link.addEventListener('click', initializeCapture);
+});

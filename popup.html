@@ -31,6 +31,31 @@
             right: 4px;
             position: relative;
         }
+
+        #wrap>div {
+            display: none;
+        }
+
+        p {
+            word-wrap: break-word;
+        }
+
+        .warning {
+            margin-top: 1em;
+            color: #aa8d3b;
+            font-style: italic;
+            font-weight: bold;
+        }
+
+        .error {
+            margin-top: 1em;
+            font-weight: bold;
+            color: #b33;
+        }
+
+        .error a {
+            color: #f75;
+        }
     </style>
     <script src="background.js"></script>
 </head>
@@ -41,6 +66,26 @@
             <img src="images/button-icons.png" /> Capture Document
         </div>
     </button>
+    <div id="wrap">
+        <div id="split-image" class="warning">
+            Note: your page is too large for the Chrome browser to capture as one image. It will be split into
+            <span id="screenshot-count">multiple</span>
+            images.
+        </div>
+        <div id="invalid" class="error">
+            Full Page Screen Capture cannot be run on this type of URL because of Google Chrome Web Store policies. Try another page
+            on the web.
+        </div>
+        <div id="uh-oh" class="error">
+            Uh oh, something went wrong! Try reloading the page, verifying javascript is enabled, and running this again.
+            <br>
+            <br> If the problem persists, please report the error in the
+            <a href="https://chrome.google.com/webstore/support/fdpohaocaechififmbbbbbknoalclacl?hl=en&gl=US#bug">Chrome webstore</a>. Please include the URL you tried it on and the version of Chrome.
+        </div>
+    </div>
+    <!-- JavaScript and HTML must be in separate files for security. -->
+    <script src="api.js"></script>
+    <script src="popup.js"></script>
 </body>
 
 </html>
